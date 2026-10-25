@@ -1,17 +1,31 @@
-import mysql.connector
+import os
+import configparser
+from pymongo import MongoClient
 
-connection = mysql.connector.connect(
-    host="127.0.0.1",
-    port=3307,
-    user="mysql_student",
-    password="MysqlDemoOnly123!",
-    database="school_mysql",
-)
+config = configparser.ConfigParser(interpolation=None)
+config.read("credentials.ini")
+environment = os.getenv("APP_ENV","dev")
 
-print("Connected to MySQL:", connection.database)
-print("Server:", connection.server_host, connection.server_port)
-cursor = connection.cursor()
-cursor.execute("SELECT environment FROM environment_info")
-print("Environment:", cursor.fetchone()[0])
-cursor.close()
-connection.close()
+username = config[environment]["username"]
+password = config[environment]["password"]
+endpoint = config[environment]["endpoint"]
+database_name = config[environment]["database"]
+
+uri = "mongodb://" + username + ":" + password + "@" + endpoint + "/" + database_name + "?authSource=admin"
+
+client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+database = client.get_database(database_name)
+
+database.command("ping")
+print("connected to MongoDB:", database.name)
+print("server:", client.adress)
+
+result = list(database.environment_info.aggregate([{"$limit": 1}]))
+
+if result:
+    print("Environment:", result[0]["name"])
+else:
+    print("Environment: Data not found")
+
+client.close()
+
